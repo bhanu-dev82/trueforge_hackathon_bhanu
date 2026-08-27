@@ -12,12 +12,12 @@ describe('AI Studio free-tier table', () => {
   });
 
   it('uses Gemma 4 26B as the high-RPD safety net, not as the primary', () => {
-    const gemma = quotaForFqn('gemma-4-26b');
+    const gemma = quotaForFqn('gemma-4-26b-a4b-it');
     assert.equal(gemma?.rpd, 14_400);
     assert.equal(gemma?.tpm, 16_000);
     assert.equal(gemma?.role, 'safety-net');
     assert.ok(DEFAULT_FAILOVER_IDS[0]?.endsWith('gemini-3.1-flash-lite'));
-    assert.ok(DEFAULT_FAILOVER_IDS.at(-1)?.endsWith('gemma-4-26b'));
+    assert.ok(DEFAULT_FAILOVER_IDS.at(-1)?.endsWith('gemma-4-26b-a4b-it'));
     assert.ok(!DEFAULT_FAILOVER_IDS.some((id) => id.includes('gemini-3.7-flash')));
   });
 

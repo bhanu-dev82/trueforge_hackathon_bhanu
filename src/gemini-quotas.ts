@@ -18,7 +18,7 @@ export interface ModelQuota {
 export const FREE_TIER_TEXT_MODELS: ModelQuota[] = [
   { dashboardName: 'Gemini 3.1 Flash Lite', modelId: 'gemini-3.1-flash-lite', rpm: 15, tpm: 250_000, rpd: 500, role: 'primary' },
   { dashboardName: 'Gemini 3.5 Flash Lite', modelId: 'gemini-3.5-flash-lite', rpm: 15, tpm: 250_000, rpd: 500, role: 'failover' },
-  { dashboardName: 'Gemma 4 26B', modelId: 'gemma-4-26b', rpm: 30, tpm: 16_000, rpd: 14_400, role: 'safety-net' },
+  { dashboardName: 'Gemma 4 26B', modelId: 'gemma-4-26b-a4b-it', rpm: 30, tpm: 16_000, rpd: 14_400, role: 'safety-net' },
   { dashboardName: 'Gemini 3.7 Flash', modelId: 'gemini-3.7-flash', rpm: 5, tpm: 250_000, rpd: 20, role: 'deep' },
   { dashboardName: 'Gemini 3.6 Flash', modelId: 'gemini-3.6-flash', rpm: 5, tpm: 250_000, rpd: 20, role: 'unused' },
   { dashboardName: 'Gemini 3.5 Flash', modelId: 'gemini-3.5-flash', rpm: 5, tpm: 250_000, rpd: 20, role: 'unused' },

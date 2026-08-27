@@ -83,7 +83,8 @@ export class ResilientModelRouter {
   ): Promise<RoutedResult<T>> {
     const attempts: RouteAttempt[] = [];
     let model = this.resolve(complexity);
-    const maxFailovers = Math.max(this.chain.length, 1);
+    const route = complexity === 'deep' && !this.chain.includes(model) ? [model, ...this.chain] : [...this.chain];
+    const maxFailovers = Math.max(route.length, 1);
 
     for (let hop = 0; hop < maxFailovers; hop += 1) {
       for (let sameModelAttempt = 1; sameModelAttempt <= 3; sameModelAttempt += 1) {
@@ -126,7 +127,7 @@ export class ResilientModelRouter {
             quotaClass: classified.quotaClass,
             waitMs: classified.waitMs,
           });
-          const next = this.nextModel(model);
+          const next = this.nextModel(model, route);
           console.warn(
             `[router] ${operationName}: ${classified.quotaClass} exhausted ${model}; new TrueForge session on ${next}`,
           );
@@ -149,15 +150,15 @@ export class ResilientModelRouter {
     );
   }
 
-  private nextModel(current: string): string {
-    const idx = this.chain.findIndex((id) => id === current);
-    for (let i = 1; i <= this.chain.length; i += 1) {
-      const candidate = this.chain[(Math.max(idx, 0) + i) % this.chain.length];
+  private nextModel(current: string, route = this.chain): string {
+    const idx = route.findIndex((id) => id === current);
+    for (let i = 1; i <= route.length; i += 1) {
+      const candidate = route[(Math.max(idx, 0) + i) % route.length];
       if (!this.exhausted.has(candidate)) {
         return candidate;
       }
     }
-    return this.chain[(Math.max(idx, 0) + 1) % this.chain.length];
+    return route[(Math.max(idx, 0) + 1) % route.length];
   }
 }
 

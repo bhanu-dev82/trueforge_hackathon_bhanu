@@ -28,8 +28,23 @@ export async function checkTrueForge(baseUrl = config.trueforgeApiUrl): Promise<
   };
 }
 
+function nestedMessage(body: unknown): string | undefined {
+  if (!body || typeof body !== 'object') return undefined;
+  const rec = body as Record<string, unknown>;
+  const inner = rec.error;
+  if (inner && typeof inner === 'object' && typeof (inner as { message?: unknown }).message === 'string') {
+    return (inner as { message: string }).message;
+  }
+  if (typeof rec.message === 'string') return rec.message;
+  return undefined;
+}
+
 export function describeTrueForgeError(error: unknown): string {
   if (error instanceof TrueForgeError) {
+    const nested = nestedMessage(error.body);
+    if (nested) {
+      return nested;
+    }
     return [error.message, error.statusCode ? `HTTP ${error.statusCode}` : undefined].filter(Boolean).join(' — ');
   }
   if (error instanceof Error) {

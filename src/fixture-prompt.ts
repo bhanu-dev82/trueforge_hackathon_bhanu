@@ -36,6 +36,6 @@ Test (tests/token_verifier.test.mjs):
 ${test}
 \`\`\`
 
-Do the Hunter → Surgeon → Insurance pipeline. Reproduce with the test command above. The bug is that verify() never checks payload.exp. Search Exa for JWT exp claim verification if needed. Draft a minimal patch. Write the regression test. Pause for approval before applying any write.
+Do the Hunter → Surgeon → Insurance pipeline. Title subagents exactly hunter-repro, surgeon-patch, insurance-tests. The bug is that verify() never checks payload.exp. Search Exa for JWT exp claim verification if needed. Draft a minimal patch. Write the regression test. Pause for approval before applying any write.
 `;
 }

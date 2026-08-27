@@ -1,34 +1,24 @@
-# Gemini errors and how this repo routes them
+# Provider routing and quota behavior
 
-Sources:
+Model availability and quota are account- and runtime-specific. This repository therefore treats the running TrueForge model catalog as authoritative and drops configured IDs that are unavailable. The IDs in `.env.example` are development examples, not guaranteed public SKUs or quota claims.
 
-- https://ai.google.dev/gemini-api/docs/rate-limits (codes, dimensions, Pacific RPD reset)
-- https://ai.google.dev/gemini-api/docs/api-errors (`rate_limit_exceeded`, `quota_exceeded`, …)
-- **This project’s AI Studio dashboard**, Free tier, “Default Gemini Project”, 2026-08-27 (RPM / TPM / RPD)
+Before a TrueForge-enhanced demo:
 
-Google does not publish a public free-tier table. The numbers below are this project’s live dashboard. Quotas are **per project**, not per API key. RPD resets at **midnight Pacific**. Free-tier spend cap is N/A.
+1. Start TrueForge.
+2. Confirm the desired models in its live catalog/settings.
+3. Put those exact IDs in `MODEL_NAME`, `MODEL_DEEP`, and `MODEL_FAILOVER_CHAIN`.
+4. Check `GET /api/health`; only claim the displayed active model.
 
-## Text models we actually route
+## Routing contract
 
-| Dashboard name | model id | RPM | TPM | RPD | Role |
-|---|---|---|---|---|---|
-| Gemini 3.1 Flash Lite | `gemini-3.1-flash-lite` | 15 | 250K | **500** | Primary |
-| Gemini 3.5 Flash Lite | `gemini-3.5-flash-lite` | 15 | 250K | **500** | Failover |
-| Gemma 4 26B | `gemma-4-26b` | 30 | 16K | **14.4K** | Last resort (tiny TPM) |
-| Gemini 3.7 Flash | `gemini-3.7-flash` | 5 | 250K | **20** | Deep only — never default failover |
-| Gemini 2.5 Flash Lite | `gemini-2.5-flash-lite` | 10 | 250K | **20** | Unused (not a 500-RPD cousin) |
+TrueForge binds a model when a session is created. The router does not swap a model inside an existing session:
 
-`gemini-2.5-flash-lite` is **20 RPD**, not 500. Do not put it on the failover chain expecting flash-lite headroom.
+- transient rate/service failures retry the same model with bounded backoff;
+- exhausted quota marks that model unavailable for the run;
+- failover opens a new TrueForge session on the next catalog-confirmed model;
+- cumulative token accounting spans failover sessions;
+- if no configured model is available, the enhanced run fails explicitly rather than inventing activity.
 
-Gemma 4 26B is the only SKU here with four-digit daily room. Its 16K TPM means a fat CI log may 429 on tokens — that is why it is last.
+Provider error classifications include `rate_limit_exceeded`, `too_many_requests`, `quota_exceeded`, `RESOURCE_EXHAUSTED`, `service_unavailable`, `api_error`, and `deadline_exceeded`. Consult the provider dashboard and documentation for current limits; do not copy historical numbers into judge-facing claims.
 
-## Error codes (`error.code`)
-
-| code | HTTP | This repo |
-|---|---|---|
-| `rate_limit_exceeded` / `too_many_requests` | 429 RPM | retry same model, then **new TrueForge session** |
-| `quota_exceeded` | 429 RPD | mark exhausted, new session on next SKU |
-| `RESOURCE_EXHAUSTED` | 429 | inspect message for per-minute vs per-day |
-| `service_unavailable` / `api_error` / `deadline_exceeded` | 503/500/504 | retry same model |
-
-Never swap models mid-session (KV cache). Failover always opens a new session.
+The credential-free LOCAL-ONLY path does not invoke a model and makes no quota claim.

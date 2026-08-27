@@ -14,8 +14,11 @@ export interface HarnessEvent {
     | 'approval'
     | 'metrics'
     | 'done'
-    | 'error';
+    | 'error'
+    | 'repro';
   text?: string;
+  exitCode?: number;
+  command?: string;
   threadId?: string;
   title?: string;
   sandboxId?: string;
@@ -52,9 +55,9 @@ export function unwrapTurnEvent(item: unknown): TrueForgeApi.TurnStreamingEvent 
 
 export function stageFromThreadTitle(title: string): PipelineStage | undefined {
   const t = title.toLowerCase();
-  if (t.includes('hunter')) return 'hunter';
-  if (t.includes('surgeon')) return 'surgeon';
-  if (t.includes('insurance')) return 'insurance';
+  if (t.includes('planner') || t.includes('hunter')) return 'hunter';
+  if (t.includes('executor') || t.includes('surgeon')) return 'surgeon';
+  if (t.includes('verifier') || t.includes('insurance')) return 'insurance';
   return undefined;
 }
 
@@ -165,6 +168,9 @@ export function observeTurn(): {
                 stage: 'error',
               }),
             );
+          } else if ((event.state.status as string) === 'waiting_for_input' && pendingApprovals.length === 0) {
+            // Parent is waiting on subagents or a question. Not a human write-gate.
+            break;
           } else {
             emitted.push(
               push({

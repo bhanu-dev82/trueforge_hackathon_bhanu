@@ -1,93 +1,90 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#dfe6df" />
-    <meta name="color-scheme" content="light" />
-    <title>Case file — expired JWT still authenticates</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=Syne:wght@600;700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/static/styles.css" />
-  </head>
-  <body>
-    <a class="skip" href="#chart">Skip to case notes</a>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#f3f0e8" />
+  <meta name="description" content="From failing CI signal to evidence-backed patch proposal, without granting silent write access." />
+  <title>TrueForge · Incident Dossier</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <a class="skip" href="#ledger">Skip to evidence ledger</a>
+  <header class="masthead">
+    <a class="wordmark" href="/" aria-label="TrueForge incident dossier home"><span class="mark" aria-hidden="true">TF</span><span>TRUEFORGE / INCIDENT DOSSIER</span></a>
+    <div class="run-meta"><span id="run-id">NO ACTIVE CASE</span><strong id="run-status" data-tone="neutral" role="status">READY</strong></div>
+  </header>
 
-    <div class="board">
-      <svg class="clip" viewBox="0 0 80 48" aria-hidden="true" focusable="false">
-        <rect x="28" y="2" width="24" height="18" rx="3" fill="#b08d57" />
-        <rect x="18" y="16" width="44" height="22" rx="4" fill="#8c6a3a" />
-        <rect x="24" y="20" width="32" height="12" rx="2" fill="#d6b36a" />
-      </svg>
+  <section class="capability-bar" aria-labelledby="cap-title">
+    <h2 id="cap-title">Startup capabilities</h2>
+    <ul id="capabilities"><li>Checking local harness…</li></ul>
+  </section>
 
-      <header class="mast">
-        <p class="file-no" translate="no">Case · fixture/auth-service</p>
-        <h1>Expired tokens still return 200</h1>
-        <p class="lede">
-          HMAC signatures are checked. The <code translate="no">exp</code> claim is not.
-          TrueForge reproduces that in a sandbox, drafts a patch, then waits for you
-          before any write.
-        </p>
-        <div class="mast-actions">
-          <button id="run" type="button">Reproduce the expired JWT</button>
-          <p id="health" class="status" role="status">Checking TrueForge…</p>
-        </div>
-      </header>
-
-      <ol class="checklist" aria-label="Surgical sequence">
-        <li data-stage="hunter"><span class="box" aria-hidden="true"></span> Hunter — run the failing test in the sandbox</li>
-        <li data-stage="surgeon"><span class="box" aria-hidden="true"></span> Surgeon — look up JWT <code translate="no">exp</code>, draft a one-line patch</li>
-        <li data-stage="insurance"><span class="box" aria-hidden="true"></span> Insurance — keep the regression test that would have caught this</li>
-        <li data-stage="approval"><span class="box" aria-hidden="true"></span> Consent — you allow or deny the write</li>
-      </ol>
-
-      <div class="split">
-        <section class="chart" id="chart">
-          <h2>Chart notes</h2>
-          <pre id="stream" class="notes" aria-live="polite">No case notes yet. Reproduce the fixture to start.</pre>
-        </section>
-
-        <aside class="vitals">
-          <h2>Vitals</h2>
-          <dl>
-            <div>
-              <dt>Model</dt>
-              <dd id="m-model" translate="no">—</dd>
-            </div>
-            <div>
-              <dt>Free-tier room</dt>
-              <dd id="m-quota">—</dd>
-            </div>
-            <div>
-              <dt>Sandbox</dt>
-              <dd id="m-sandbox" translate="no">—</dd>
-            </div>
-            <div>
-              <dt>Subagents</dt>
-              <dd id="m-threads">—</dd>
-            </div>
-            <div>
-              <dt>Tokens</dt>
-              <dd id="m-tokens">from TrueForge metrics, not an estimate</dd>
-            </div>
-          </dl>
-        </aside>
+  <main>
+    <section class="brief" aria-labelledby="page-title">
+      <div class="brief-copy">
+        <p class="eyebrow">Human-governed CI investigation</p>
+        <h1 id="page-title">From failing CI signal to evidence-backed patch proposal, without granting silent write access.</h1>
+        <p class="deck">A planner bounds the case, an executor reproduces it in the safest available runtime, and an independent verifier challenges the result. Every write pauses for an informed decision.</p>
       </div>
-    </div>
+      <aside class="sample-card" aria-label="Loaded example">
+        <p><strong>Clearly labeled sample</strong> · Edit anything below</p>
+        <dl><div><dt>Incident</dt><dd>Expired tokens are accepted</dd></div><div><dt>Expected</dt><dd class="good">401</dd></div><div><dt>Received</dt><dd class="bad">200</dd></div></dl>
+      </aside>
+    </section>
 
-    <dialog id="gate" aria-labelledby="gate-title">
-      <h2 id="gate-title">Awaiting consent</h2>
-      <p id="gate-detail">A write or destructive tool is paused. Nothing is applied until you choose.</p>
-      <div class="gate-actions">
-        <button id="allow" type="button" class="allow">Allow write</button>
-        <button id="deny" type="button" class="deny">Deny write</button>
-      </div>
-    </dialog>
+    <div id="notice" class="notice" hidden role="alert"></div>
 
-    <script src="/static/app.js" type="module"></script>
-  </body>
+    <section class="workbench" aria-label="Incident workbench">
+      <article class="intake-panel ruled">
+        <div class="section-head"><div><p class="folio">01 / INTAKE</p><h2>Define the incident</h2></div><span id="source-label">SAMPLE INPUT</span></div>
+        <form id="intake">
+          <label>Incident title<input name="title" value="Expired tokens are accepted" maxlength="160" required /></label>
+          <label>Failure report<textarea name="failureReport" rows="5" maxlength="30000" required>TokenVerifier rejects an expired JWT: expected status 401, received 200. Inspect payload.exp handling.</textarea></label>
+          <div class="field-pair">
+            <label>Repository path<input name="repositoryPath" value="fixture/auth-service" required /></label>
+            <label>Test command<input name="testCommand" value="node --test tests/token_verifier.test.mjs" required /></label>
+          </div>
+          <p class="safety-note">Commands are parsed without a shell and must use an allowlisted executable. Runtime selection prefers a rootless container, then an ephemeral worktree, then a bounded local process.</p>
+          <div class="actions"><button id="run" type="submit">Start investigation</button><span id="connection-note">Checking availability…</span></div>
+        </form>
+      </article>
+
+      <aside class="operations ruled" aria-labelledby="ops-title">
+        <div class="section-head"><div><p class="folio">02 / OPERATIONS</p><h2 id="ops-title">Control room</h2></div></div>
+        <ol id="roles" class="roles">
+          <li data-role="planner"><b>Planner</b><span>Bounds scope and evidence</span><em>Not started</em></li>
+          <li data-role="executor"><b>Executor</b><span>Runs the supplied test</span><em>Not started</em></li>
+          <li data-role="verifier"><b>Independent verifier</b><span>Challenges the diagnosis</span><em>Not started</em></li>
+          <li data-role="operator"><b>Operator gate</b><span>Controls every write</span><em>Standing by</em></li>
+        </ol>
+        <div class="runtime-card"><h3>Runtime evidence</h3><dl id="runtime"><div><dt>Mode</dt><dd>Not selected</dd></div><div><dt>Isolation</dt><dd>Unknown</dd></div><div><dt>Detail</dt><dd>Starts when investigation begins</dd></div></dl></div>
+      </aside>
+    </section>
+
+    <section id="ledger" class="ledger ruled" aria-labelledby="ledger-title">
+      <div class="section-head ledger-head"><div><p class="folio">03 / CASE FILE</p><h2 id="ledger-title">Evidence ledger</h2></div><div class="case-actions"><button id="copy" class="quiet" type="button" disabled>Copy case file</button><button id="download" class="quiet" type="button" disabled>Download JSON</button></div></div>
+      <div class="legend" aria-label="Evidence confidence legend"><span data-class="observed">Observed</span><span data-class="inferred">Inferred</span><span data-class="proposed">Proposed</span><span data-class="verified">Verified</span></div>
+      <ol id="evidence-list" class="evidence-list" aria-live="polite"><li class="empty">No evidence yet. Start an investigation to create a durable case file.</li></ol>
+      <section id="outcome" class="outcome" hidden></section>
+      <details class="event-log"><summary>Technical event log <span id="stream-state">not connected</span></summary><ol id="events"></ol></details>
+    </section>
+  </main>
+
+  <dialog id="gate" aria-labelledby="gate-title" aria-describedby="gate-summary">
+    <form method="dialog" class="drawer">
+      <header><p class="folio danger">WRITE BOUNDARY / DECISION REQUIRED</p><h2 id="gate-title">Review the exact proposed action</h2><p id="gate-summary">Nothing has been applied. Deny is focused by default.</p></header>
+      <dl class="approval-facts">
+        <div><dt>Action</dt><dd id="approval-action">—</dd></div><div><dt>Tool</dt><dd id="approval-tool">—</dd></div><div><dt>Target</dt><dd id="approval-target">—</dd></div><div><dt>Reversible</dt><dd id="approval-reversible">—</dd></div>
+      </dl>
+      <section><h3>Files</h3><ul id="approval-files"><li>Not supplied</li></ul></section>
+      <section><h3>Proposed diff</h3><pre id="approval-diff">No diff supplied by the tool.</pre></section>
+      <section><h3>Test evidence</h3><ul id="approval-tests"><li>No test evidence supplied.</li></ul></section>
+      <p class="decision-warning">Approval authorizes only the action shown above. It does not grant ongoing write access.</p>
+      <footer><button id="deny" type="button" class="deny">Keep blocked</button><button id="allow" type="button" class="allow">Approve this action</button></footer>
+    </form>
+  </dialog>
+  <script src="/static/app.js" type="module"></script>
+</body>
 </html>

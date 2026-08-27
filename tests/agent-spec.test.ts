@@ -2,18 +2,20 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { AGENT_NAME, buildAgentSpec } from '../src/agent-spec.js';
 import { loadConfig } from '../src/config.js';
-import { stageFromThreadTitle, unwrapTurnEvent } from '../src/events.js';
+import { observeTurn, stageFromThreadTitle, unwrapTurnEvent } from '../src/events.js';
 
 describe('agent spec', () => {
-  it('enables sandbox, subagents, genui, deferred exa tools', () => {
+  it('keeps mutation-capable sandbox off while enabling subagents, genui, and deferred exa tools', () => {
     const spec = buildAgentSpec(
       loadConfig({ TRUEFORGE_API_URL: 'http://localhost:8790' }),
       'google-gemini/gemini-3.1-flash-lite',
     );
     assert.equal(AGENT_NAME, 'ci-failure-surgeon');
     assert.equal(spec.model.name, 'google-gemini/gemini-3.1-flash-lite');
-    assert.equal(spec.config?.sandbox?.enabled, true);
+    assert.equal(spec.config?.sandbox?.enabled, false);
+    assert.equal(spec.config?.sandbox?.fileDownloads, false);
     assert.equal(spec.config?.dynamicSubAgents?.enabled, true);
+    assert.equal(spec.config?.askUserQuestions?.enabled, false);
     assert.equal(spec.config?.generativeUi?.enabled, true);
     assert.equal(spec.mcpServers?.[0]?.name, 'exa');
     assert.equal(spec.mcpServers?.[0]?.preload, false);
@@ -46,8 +48,20 @@ describe('turn events', () => {
   });
 
   it('maps subagent titles onto pipeline stages', () => {
-    assert.equal(stageFromThreadTitle('hunter-repro'), 'hunter');
-    assert.equal(stageFromThreadTitle('surgeon-patch'), 'surgeon');
-    assert.equal(stageFromThreadTitle('insurance-tests'), 'insurance');
+    assert.equal(stageFromThreadTitle('planner'), 'hunter');
+    assert.equal(stageFromThreadTitle('executor'), 'surgeon');
+    assert.equal(stageFromThreadTitle('independent-verifier'), 'insurance');
+  });
+
+  it('does not treat waiting_for_input as a human pause unless a write is gated', () => {
+    const observer = observeTurn();
+    const emitted = observer.feed({
+      type: 'turn.done',
+      createdAt: 't',
+      id: '1',
+      threadId: 'main',
+      state: { status: 'waiting_for_input' },
+    } as never);
+    assert.equal(emitted.length, 0);
   });
 });

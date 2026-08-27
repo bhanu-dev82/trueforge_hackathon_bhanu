@@ -49,3 +49,21 @@ describe('Router Exhaustion & Hop Ledger', () => {
     assert.equal(result.modelFqn, 'google-gemini/model-b');
   });
 });
+
+  it('tries the primary after a deep-only model fails', async () => {
+    const cfg = loadConfig({
+      TRUEFORGE_API_URL: 'http://localhost:8790',
+      MODEL_NAME: 'google-gemini/model-primary',
+      MODEL_DEEP: 'google-gemini/model-deep',
+      MODEL_FAILOVER_CHAIN: 'google-gemini/model-secondary',
+    });
+    const router = new ResilientModelRouter(cfg);
+    const seen: string[] = [];
+    const result = await router.execute('deepHop', async (model) => {
+      seen.push(model);
+      if (model.endsWith('model-deep')) throw new TrueForgeError({ statusCode: 429, body: { error: { code: 'quota_exceeded', message: 'daily quota' } } });
+      return model;
+    }, 'deep');
+    assert.deepEqual(seen, ['google-gemini/model-deep', 'google-gemini/model-primary']);
+    assert.equal(result.modelFqn, 'google-gemini/model-primary');
+  });

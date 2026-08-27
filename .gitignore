@@ -16,7 +16,8 @@ coverage/
 *.sqlite
 *.db
 
-# Approval ledger (local demo only)
+# Local run case files and approval ledger
+.ci-surgeon/
 audit/
 
 # Logs

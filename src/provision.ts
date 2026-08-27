@@ -1,6 +1,7 @@
 import type { TrueForge } from '@truefoundry/trueforge-sdk';
 import type { AppConfig } from './config.js';
 import { toModelFqn } from './config.js';
+import { describeTrueForgeError } from './harness.js';
 
 function modelIdFromFqn(fqn: string): string {
   const slash = fqn.lastIndexOf('/');
@@ -11,13 +12,55 @@ function resourceName(modelId: string): string {
   return modelId.replace(/[._]/g, '-');
 }
 
+export interface SandboxStatus {
+  configured: boolean;
+  type?: string;
+  status?: string;
+  reason?: string;
+}
+
+let lastDaytonaNote: string | undefined;
+
+export function lastSandboxNote(): string | undefined {
+  return lastDaytonaNote;
+}
+
+export function daytonaManifest(apiKey: string) {
+  return {
+    type: 'daytona' as const,
+    auth: { apiKey },
+    autoStopIntervalInMinutes: 15,
+    autoArchiveIntervalInMinutes: 60,
+    autoDeleteIntervalInMinutes: 180,
+    execTimeoutMs: 120_000,
+  };
+}
+
+export async function readSandboxStatus(client: TrueForge): Promise<SandboxStatus> {
+  try {
+    const { data } = await client.settings.sandboxProviders.get();
+    const type = data?.manifest?.type ?? undefined;
+    return {
+      configured: Boolean(type),
+      type,
+      status: data?.status ?? undefined,
+      reason: data?.statusReason ?? undefined,
+    };
+  } catch {
+    return { configured: false };
+  }
+}
+
 /**
- * Push Gemini, Exa, and optional GitHub into the running TrueForge instance
- * so judges are not blocked on a Settings click-path.
+ * Push Gemini, Exa, optional GitHub, and Daytona into the running TrueForge
+ * instance so judges are not blocked on a Settings click-path.
  *
  * Failures are logged and ignored: the operator can still configure the UI.
  */
-export async function provisionHarness(client: TrueForge, cfg: AppConfig): Promise<string[]> {
+export async function provisionHarness(
+  client: TrueForge,
+  cfg: AppConfig,
+): Promise<{ notes: string[]; sandbox: SandboxStatus }> {
   const notes: string[] = [];
 
   if (cfg.geminiApiKey) {
@@ -84,5 +127,28 @@ export async function provisionHarness(client: TrueForge, cfg: AppConfig): Promi
     }
   }
 
-  return notes;
+  if (cfg.daytonaApiKey) {
+    try {
+      await client.settings.sandboxProviders.createOrUpdate({
+        manifest: daytonaManifest(cfg.daytonaApiKey),
+      });
+      lastDaytonaNote = undefined;
+      notes.push('daytona sandbox provider upserted into TrueForge Settings');
+    } catch (error) {
+      lastDaytonaNote = describeTrueForgeError(error);
+      notes.push(`daytona sandbox skipped: ${lastDaytonaNote}`);
+    }
+  } else {
+    lastDaytonaNote = 'DAYTONA_API_KEY is not set';
+    notes.push('DAYTONA_API_KEY missing — sandbox stays off so the run does not 422');
+  }
+
+  const sandbox = await readSandboxStatus(client);
+  if (sandbox.configured) {
+    notes.push(`sandbox provider live: ${sandbox.type ?? 'unknown'} (${sandbox.status ?? 'ready'})`);
+  } else {
+    notes.push('sandbox provider not configured in TrueForge — sessions will run without isolation');
+  }
+
+  return { notes, sandbox };
 }

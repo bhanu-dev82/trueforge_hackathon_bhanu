@@ -6,8 +6,10 @@ import { checkTrueForge, createTrueForgeClient, describeTrueForgeError } from '.
 import { ResilientModelRouter } from './model-router.js';
 import { provisionHarness } from './provision.js';
 import { fixtureFailurePrompt } from './fixture-prompt.js';
+import { runFixtureTestLocally } from './local-runner.js';
 import { toHandoffPrompt, type CaseFile } from './case-file.js';
 import { discoverModels, reconcileChain } from './model-catalog.js';
+import { redact } from './redaction.js';
 import { addUsage, evaluateBudget, readUsage, type Usage } from './tokenomics.js';
 export interface TriageResult {
   sessionId: string;
@@ -24,6 +26,7 @@ export class CIFailureSurgeon {
   private readonly router: ResilientModelRouter;
   private provisionNotes: string[] = [];
   private provisioned = false;
+  private sandboxReady = false;
   private usageAcc: Partial<Usage> = {};
   private caseFile: CaseFile = {
     repoUrl: 'fixture/auth-service',
@@ -45,9 +48,12 @@ export class CIFailureSurgeon {
       return { ...health, notes: [] };
     }
     if (!this.provisioned) {
-      this.provisionNotes = await provisionHarness(this.client, this.cfg);
+      const provisioned = await provisionHarness(this.client, this.cfg);
+      this.provisionNotes = provisioned.notes;
+      this.sandboxReady = provisioned.sandbox.configured;
       const catalog = await discoverModels(this.cfg);
-      const reconciled = reconcileChain(this.cfg.modelFailoverChain, catalog);
+      const configured = [this.cfg.modelName, ...this.cfg.modelFailoverChain];
+      const reconciled = reconcileChain(configured, catalog);
       if (reconciled.chain.length > 0) {
         this.router.replaceChain(reconciled.chain);
       }
@@ -59,10 +65,36 @@ export class CIFailureSurgeon {
     return { ok: true, detail: health.detail, notes: this.provisionNotes };
   }
 
-  async triage(failureReport = fixtureFailurePrompt()): Promise<TriageResult> {
+  async triage(
+    failureReport = fixtureFailurePrompt(),
+    preRepro?: { command: string; exitCode: number; output: string },
+  ): Promise<TriageResult> {
+    this.usageAcc = {};
     const pre = await this.preflight();
     if (!pre.ok) {
       throw new Error(pre.detail);
+    }
+    const sandboxNotes = this.provisionNotes.filter((note) => /sandbox|daytona/i.test(note));
+    for (const note of sandboxNotes) {
+      this.emit({ at: new Date().toISOString(), kind: 'log', text: note });
+    }
+    try {
+      const repro = preRepro ?? await runFixtureTestLocally();
+      this.caseFile.stackHead = repro.output.slice(-600);
+      this.emit({
+        at: new Date().toISOString(),
+        kind: 'repro',
+        command: repro.command,
+        exitCode: repro.exitCode,
+        text: repro.output.slice(-800),
+        stage: 'hunter',
+      });
+    } catch (error) {
+      this.emit({
+        at: new Date().toISOString(),
+        kind: 'log',
+        text: `pre-repro skipped: ${error instanceof Error ? error.message : String(error)}`,
+      });
     }
 
     const routed = await this.router.execute(
@@ -75,7 +107,11 @@ export class CIFailureSurgeon {
           text: hop > 0 ? `new session after quota failover → ${modelFqn}` : `session model ${modelFqn}`,
         });
         const sessionId = await this.openSession(modelFqn);
-        const prompt = hop > 0 ? `${toHandoffPrompt(this.caseFile)}\n\n${failureReport}` : failureReport;
+        const isolation = 'Mutation-capable TrueForge sandbox tools are disabled during analysis. Do not claim a sandbox. The test was already reproduced by the controlled runtime; use that evidence, draft only, and pause before any write.';
+        const prompt =
+          hop > 0
+            ? `${toHandoffPrompt(this.caseFile)}\n\n${isolation}\n\n${failureReport}`
+            : `${isolation}\n\n${failureReport}`;
         return this.runUserTurn(sessionId, prompt, modelFqn);
       },
       'standard',
@@ -97,20 +133,45 @@ export class CIFailureSurgeon {
         approval: { status: allow ? 'allow' : 'deny' },
       })),
     });
-    return this.consume(stream);
+    const observation = await this.consume(stream);
+    this.accountUsage(observation, 'approval continuation');
+    return observation;
   }
 
-  private async openSession(modelFqn: string): Promise<string> {
-    const spec = buildAgentSpec(this.cfg, modelFqn);
+  private async upsertAgent(spec: ReturnType<typeof buildAgentSpec>): Promise<void> {
+    try {
+      const listed = await this.client.agents.list();
+      const existing = listed.data?.find((agent) => agent.name === AGENT_NAME);
+      if (existing?.id) {
+        await this.client.agents.update(existing.id, { manifest: spec });
+        return;
+      }
+    } catch {
+      // Fall through to create.
+    }
     try {
       await this.client.agents.create({ name: AGENT_NAME, manifest: spec });
     } catch {
-      // Name already taken — the live spec is still passed inline below.
+      // Name taken between list and create — inline spec on the session still wins.
     }
+  }
 
-    const { data: session } = await this.client.sessions.create({
-      agent: { spec },
-    });
+  private async openSession(modelFqn: string): Promise<string> {
+    const spec = buildAgentSpec(this.cfg, modelFqn, { sandboxEnabled: this.sandboxReady });
+    await this.upsertAgent(spec);
+
+    let session;
+    try {
+      ({ data: session } = await this.client.sessions.create({
+        agent: { spec },
+      }));
+    } catch (error) {
+      if (error instanceof TrueForgeError) throw error;
+      throw new Error(this.safeMessage(error));
+    }
+    if (!session?.id) {
+      throw new Error('TrueForge created a session without an id');
+    }
     this.emit({
       at: new Date().toISOString(),
       kind: 'log',
@@ -130,18 +191,7 @@ export class CIFailureSurgeon {
     if (observation.outputText) {
       this.caseFile.stackHead = observation.outputText.slice(0, 600);
     }
-    this.usageAcc = addUsage(this.usageAcc, readUsage(observation.metrics));
-    const budget = evaluateBudget(this.usageAcc, this.cfg);
-    this.emit({
-      at: new Date().toISOString(),
-      kind: 'metrics',
-      text: formatTokenomics(observation.metrics, modelFqn),
-      modelFqn,
-      metrics: observation.metrics,
-    });
-    if (budget.breached) {
-      throw new Error(`budget ${budget.used}/${budget.cap} tokens exceeded`);
-    }
+    this.accountUsage(observation, modelFqn);
     if (observation.status === 'error') {
       const errText = observation.events.find((e) => e.kind === 'error')?.text ?? 'turn error';
       throw new Error(errText);
@@ -153,6 +203,24 @@ export class CIFailureSurgeon {
       tokenomics: formatTokenomics(observation.metrics, modelFqn),
       provisionNotes: this.provisionNotes,
     };
+  }
+
+  private accountUsage(observation: TurnObservation, label: string): void {
+    this.usageAcc = addUsage(this.usageAcc, readUsage(observation.metrics));
+    const budget = evaluateBudget(this.usageAcc, this.cfg);
+    this.emit({
+      at: new Date().toISOString(), kind: 'metrics',
+      text: `${formatTokenomics(observation.metrics, label)} | run-budget=${budget.used}/${budget.cap}`,
+      modelFqn: label, metrics: observation.metrics,
+    });
+    if (budget.breached) throw new Error(`budget ${budget.used}/${budget.cap} tokens exceeded`);
+  }
+
+  private safeMessage(error: unknown): string {
+    return redact(describeTrueForgeError(error), [
+      this.cfg.trueforgeApiToken, this.cfg.geminiApiKey, this.cfg.exaApiKey,
+      this.cfg.githubToken, this.cfg.daytonaApiKey,
+    ]);
   }
 
   private async consume(stream: AsyncIterable<unknown>): Promise<TurnObservation> {
@@ -172,10 +240,19 @@ export class CIFailureSurgeon {
         }
       }
     } catch (error) {
+      const message = this.safeMessage(error);
+      if (/sandbox is enabled but no sandbox provider/i.test(message)) {
+        this.emit({
+          at: new Date().toISOString(),
+          kind: 'log',
+          text: 'Sandbox skipped. Daytona is not configured. The steps above still stand.',
+        });
+        return observer.snapshot();
+      }
       if (error instanceof TrueForgeError) {
         throw error;
       }
-      throw new Error(describeTrueForgeError(error));
+      throw new Error(message);
     }
     return observer.snapshot();
   }
