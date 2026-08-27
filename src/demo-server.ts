@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -95,7 +96,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && url.pathname === '/api/runs') {
-      const runId = `run_${Date.now().toString(36)}`;
+      const runId = `run_${randomUUID()}`;
       const run: RunState = { id: runId, events: [], clients: new Set() };
       runs.set(runId, run);
 
@@ -121,9 +122,11 @@ const server = createServer(async (req, res) => {
             metrics: result.observation.metrics,
           };
           run.events.push(done);
+          const complete = { kind: 'run.complete' as const, sessionId: result.sessionId };
+          run.events.push(complete as unknown as HarnessEvent);
           for (const client of run.clients) {
             sseWrite(client, done);
-            sseWrite(client, { kind: 'run.complete', sessionId: result.sessionId });
+            sseWrite(client, complete);
           }
         })
         .catch((error) => {
@@ -162,12 +165,12 @@ const server = createServer(async (req, res) => {
     const approveMatch = url.pathname.match(/^\/api\/runs\/([^/]+)\/approve$/);
     if (req.method === 'POST' && approveMatch) {
       const run = runs.get(approveMatch[1]);
-      if (!run?.sessionId || !run.observation?.pendingApprovals[0]) {
+      const pending = run?.observation?.pendingApprovals.shift();
+      if (!run?.sessionId || !pending) {
         send(res, 409, { error: 'nothing waiting for approval' });
         return;
       }
       const body = JSON.parse((await readBody(req)) || '{}') as { allow?: boolean };
-      const pending = run.observation.pendingApprovals[0];
       const surgeon = new CIFailureSurgeon(config, (event) => {
         run.events.push(event);
         for (const client of run.clients) {

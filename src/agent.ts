@@ -1,4 +1,4 @@
-import { TrueForge } from '@truefoundry/trueforge-sdk';
+import { TrueForge, TrueForgeError } from '@truefoundry/trueforge-sdk';
 import { AGENT_NAME, buildAgentSpec } from './agent-spec.js';
 import { config, type AppConfig } from './config.js';
 import { formatTokenomics, observeTurn, unwrapTurnEvent, type HarnessEvent, type TurnObservation } from './events.js';
@@ -7,8 +7,8 @@ import { ResilientModelRouter } from './model-router.js';
 import { provisionHarness } from './provision.js';
 import { fixtureFailurePrompt } from './fixture-prompt.js';
 import { toHandoffPrompt, type CaseFile } from './case-file.js';
-import { evaluateBudget, readUsage } from './tokenomics.js';
-
+import { discoverModels, reconcileChain } from './model-catalog.js';
+import { addUsage, evaluateBudget, readUsage, type Usage } from './tokenomics.js';
 export interface TriageResult {
   sessionId: string;
   modelFqn: string;
@@ -24,6 +24,7 @@ export class CIFailureSurgeon {
   private readonly router: ResilientModelRouter;
   private provisionNotes: string[] = [];
   private provisioned = false;
+  private usageAcc: Partial<Usage> = {};
   private caseFile: CaseFile = {
     repoUrl: 'fixture/auth-service',
     testCommand: 'node --test tests/token_verifier.test.mjs',
@@ -45,6 +46,14 @@ export class CIFailureSurgeon {
     }
     if (!this.provisioned) {
       this.provisionNotes = await provisionHarness(this.client, this.cfg);
+      const catalog = await discoverModels(this.cfg);
+      const reconciled = reconcileChain(this.cfg.modelFailoverChain, catalog);
+      if (reconciled.chain.length > 0) {
+        this.router.replaceChain(reconciled.chain);
+      }
+      if (reconciled.dropped.length) {
+        this.provisionNotes.push(`catalog dropped unavailable models: ${reconciled.dropped.join(', ')}`);
+      }
       this.provisioned = true;
     }
     return { ok: true, detail: health.detail, notes: this.provisionNotes };
@@ -121,7 +130,8 @@ export class CIFailureSurgeon {
     if (observation.outputText) {
       this.caseFile.stackHead = observation.outputText.slice(0, 600);
     }
-    const budget = evaluateBudget(readUsage(observation.metrics), this.cfg);
+    this.usageAcc = addUsage(this.usageAcc, readUsage(observation.metrics));
+    const budget = evaluateBudget(this.usageAcc, this.cfg);
     this.emit({
       at: new Date().toISOString(),
       kind: 'metrics',
@@ -162,6 +172,9 @@ export class CIFailureSurgeon {
         }
       }
     } catch (error) {
+      if (error instanceof TrueForgeError) {
+        throw error;
+      }
       throw new Error(describeTrueForgeError(error));
     }
     return observer.snapshot();

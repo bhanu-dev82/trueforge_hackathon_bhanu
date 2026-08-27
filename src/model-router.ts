@@ -67,6 +67,15 @@ export class ResilientModelRouter {
     this.exhausted.add(toModelFqn(modelFqn));
   }
 
+  replaceChain(chain: string[]): void {
+    const next = chain.map(toModelFqn).filter(Boolean);
+    if (next.length === 0) {
+      return;
+    }
+    this.chain.splice(0, this.chain.length, ...next);
+    this.cursor = 0;
+  }
+
   async execute<T>(
     operationName: string,
     run: (modelFqn: string, hop: number) => Promise<T>,
@@ -74,62 +83,63 @@ export class ResilientModelRouter {
   ): Promise<RoutedResult<T>> {
     const attempts: RouteAttempt[] = [];
     let model = this.resolve(complexity);
-    let sameModelAttempt = 1;
+    const maxFailovers = Math.max(this.chain.length, 1);
 
-    for (let hop = 0; hop < this.chain.length + 2; hop += 1) {
-      try {
-        const value = await run(model, hop);
-        attempts.push({ modelFqn: model, attempt: sameModelAttempt, outcome: 'ok' });
-        return { value, modelFqn: model, attempts };
-      } catch (error) {
-        const classified = classifyProviderError(error, sameModelAttempt);
-        if (classified.quotaClass === 'none') {
+    for (let hop = 0; hop < maxFailovers; hop += 1) {
+      for (let sameModelAttempt = 1; sameModelAttempt <= 3; sameModelAttempt += 1) {
+        try {
+          const value = await run(model, hop);
+          attempts.push({ modelFqn: model, attempt: sameModelAttempt, outcome: 'ok' });
+          return { value, modelFqn: model, attempts };
+        } catch (error) {
+          const classified = classifyProviderError(error, sameModelAttempt);
+          if (classified.quotaClass === 'none') {
+            attempts.push({
+              modelFqn: model,
+              attempt: sameModelAttempt,
+              outcome: 'failed',
+              quotaClass: classified.quotaClass,
+            });
+            throw error;
+          }
+
+          if (classified.retrySameModel && sameModelAttempt < 3) {
+            attempts.push({
+              modelFqn: model,
+              attempt: sameModelAttempt,
+              outcome: 'retry-same',
+              quotaClass: classified.quotaClass,
+              waitMs: classified.waitMs,
+            });
+            console.warn(
+              `[router] ${operationName}: ${classified.quotaClass} on ${model}; retrying same model in ${classified.waitMs}ms`,
+            );
+            await sleep(classified.waitMs);
+            continue;
+          }
+
+          this.markExhausted(model);
           attempts.push({
             modelFqn: model,
             attempt: sameModelAttempt,
-            outcome: 'failed',
-            quotaClass: classified.quotaClass,
-          });
-          throw error;
-        }
-
-        if (classified.retrySameModel) {
-          attempts.push({
-            modelFqn: model,
-            attempt: sameModelAttempt,
-            outcome: 'retry-same',
+            outcome: 'failover',
             quotaClass: classified.quotaClass,
             waitMs: classified.waitMs,
           });
+          const next = this.nextModel(model);
           console.warn(
-            `[router] ${operationName}: ${classified.quotaClass} on ${model}; retrying same model in ${classified.waitMs}ms`,
+            `[router] ${operationName}: ${classified.quotaClass} exhausted ${model}; new TrueForge session on ${next}`,
           );
-          await sleep(classified.waitMs);
-          sameModelAttempt += 1;
-          continue;
+          if (classified.waitMs > 0) {
+            await sleep(classified.waitMs);
+          }
+          model = next;
+          this.cursor = Math.max(
+            0,
+            this.chain.findIndex((id) => id === next),
+          );
+          break;
         }
-
-        this.markExhausted(model);
-        attempts.push({
-          modelFqn: model,
-          attempt: sameModelAttempt,
-          outcome: 'failover',
-          quotaClass: classified.quotaClass,
-          waitMs: classified.waitMs,
-        });
-        const next = this.nextModel(model);
-        console.warn(
-          `[router] ${operationName}: ${classified.quotaClass} exhausted ${model}; new TrueForge session on ${next}`,
-        );
-        if (classified.waitMs > 0) {
-          await sleep(classified.waitMs);
-        }
-        model = next;
-        sameModelAttempt = 1;
-        this.cursor = Math.max(
-          0,
-          this.chain.findIndex((id) => id === next),
-        );
       }
     }
 

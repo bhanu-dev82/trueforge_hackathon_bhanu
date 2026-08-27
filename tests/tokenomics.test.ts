@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readUsage, evaluateBudget, calculateCacheHitRate } from '../src/tokenomics.js';
+import { addUsage, readUsage, evaluateBudget, calculateCacheHitRate } from '../src/tokenomics.js';
 import { loadConfig } from '../src/config.js';
 
 describe('Tokenomics & Budget Accounting Test Suite', () => {
@@ -44,5 +44,8 @@ describe('Tokenomics & Budget Accounting Test Suite', () => {
     const budgetBreach = evaluateBudget(usageBreach, cfg);
     assert.equal(budgetBreach.used, 1200);
     assert.equal(budgetBreach.breached, true);
+
+    const summed = addUsage({ input: 400, output: 50 }, { input: 400, output: 50 });
+    assert.equal(evaluateBudget(summed, cfg).used, 900);
   });
 });

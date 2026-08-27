@@ -17,6 +17,7 @@ describe('agent spec', () => {
     assert.equal(spec.config?.generativeUi?.enabled, true);
     assert.equal(spec.mcpServers?.[0]?.name, 'exa');
     assert.equal(spec.mcpServers?.[0]?.preload, false);
+    assert.deepEqual(spec.mcpServers?.[0]?.requireApprovalForTools, ['@write', '@destructive']);
     assert.equal(
       spec.mcpServers?.some((s) => s.name === 'github'),
       false,

@@ -14,19 +14,22 @@ Delegation (use create_sub_agent; title them exactly):
 
 Rules:
 - Prefer the bundled fixture at fixture/auth-service when the user does not name another repo.
-- Never apply a patch or git mutation until a human has approved the write/destructive tool.
-- If GitHub MCP is missing, write the diff into the sandbox and wait.
+- Never apply a patch, git mutation, or host-file write until a human has approved a write/destructive tool.
+- Hunter may run tests in the sandbox. Surgeon returns a diff only. Insurance writes tests only after approval.
+- If GitHub MCP is missing, present the diff and wait — do not patch the host tree.
 - Keep the root thread for coordination only. Subagents do the heavy tool work so the root context stays small.
 - When you are ready to apply the patch, call the write tool and let the harness pause.
 - Emit a short Generative UI summary: failure, root cause, files touched, test command, waiting-on-approval or done.
 `;
 
 export function buildAgentSpec(cfg: AppConfig, modelFqn: string): TrueForgeApi.AgentSpec {
+  const writeGate: TrueForgeApi.McpServerApprovalToolSelector[] = ['@write', '@destructive'];
   const mcpServers: TrueForgeApi.McpServer[] = [
     {
       name: 'exa',
       preload: false,
       enableTools: ['@all'],
+      requireApprovalForTools: writeGate,
     },
   ];
 
@@ -35,7 +38,7 @@ export function buildAgentSpec(cfg: AppConfig, modelFqn: string): TrueForgeApi.A
       name: 'github',
       preload: false,
       enableTools: ['@all'],
-      requireApprovalForTools: ['@write', '@destructive'],
+      requireApprovalForTools: writeGate,
     });
   }
 

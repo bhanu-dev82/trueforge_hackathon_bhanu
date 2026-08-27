@@ -46,6 +46,16 @@ export interface BudgetState {
   breached: boolean;
 }
 
+export function addUsage(a: Partial<Usage>, b: Partial<Usage>): Partial<Usage> {
+  const sum = (x?: number, y?: number): number | undefined =>
+    x === undefined && y === undefined ? undefined : (x ?? 0) + (y ?? 0);
+  return {
+    input: sum(a.input, b.input),
+    output: sum(a.output, b.output),
+    cacheRead: sum(a.cacheRead, b.cacheRead),
+  };
+}
+
 export function evaluateBudget(u: Partial<Usage>, cfg: AppConfig): BudgetState {
   const used = (u.input ?? 0) + (u.output ?? 0);
   const cap = cfg.budgetTokensPerRun;
