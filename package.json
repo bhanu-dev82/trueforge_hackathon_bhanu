@@ -1,0 +1,28 @@
+{
+  "name": "trueforge-agent-harness-submission",
+  "version": "1.0.0",
+  "description": "Production AI Agent built with TrueForge for The Agent Harness Hackathon",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "jest"
+  },
+  "keywords": ["trueforge", "agent-harness", "truefoundry", "mcp", "qodo"],
+  "author": "Hackathon Team",
+  "license": "MIT",
+  "dependencies": {
+    "@truefoundry/trueforge-sdk": "^0.1.0",
+    "dotenv": "^16.4.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^22.10.1",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}

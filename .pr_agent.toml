@@ -1,0 +1,14 @@
+[pr_reviewer]
+# Run automatically on opened PRs
+auto_review = true
+num_code_suggestions = 4
+require_focused_review = true
+enable_review_labels = true
+
+[pr_description]
+publish_description_as_comment = false
+add_custom_labels = ["qodo-reviewed", "agent-harness-hackathon"]
+
+[pr_code_suggestions]
+num_code_suggestions = 4
+summarize = true
