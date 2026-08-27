@@ -1,40 +1,21 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "description": "TrueForge Local & Remote MCP Tool Server Registry",
+  "description": "Connectors this agent expects in TrueForge Settings → Connectors. Names must match the TrueForge catalog (`exa`, `github`). npm run demo upserts these when keys are present.",
   "mcpServers": {
+    "exa": {
+      "type": "remote",
+      "url": "https://mcp.exa.ai/mcp",
+      "description": "Web search and page fetch"
+    },
     "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
-      },
-      "description": "Repository file access, PR creation, and issue management"
-    },
-    "slack": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-slack"],
-      "env": {
-        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}"
-      },
-      "description": "Send alerts, triage discussions, and interactive incident notifications"
-    },
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "./workspace"],
-      "description": "Safe local file manipulation within project workspace"
-    },
-    "postgres": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-postgres", "${DATABASE_URL}"],
-      "description": "Read-only schema inspection and SQL diagnostic queries"
-    },
-    "exa-search": {
-      "url": "https://mcp.exa.ai/sse",
-      "transport": "sse",
+      "type": "remote",
+      "url": "https://api.githubcopilot.com/mcp/",
       "auth": {
-        "type": "none"
+        "type": "header",
+        "headers": {
+          "Authorization": "Bearer ${GITHUB_TOKEN}"
+        }
       },
-      "description": "High-accuracy live web search and deep scraping"
+      "description": "Optional PR creation after approval"
     }
   }
 }

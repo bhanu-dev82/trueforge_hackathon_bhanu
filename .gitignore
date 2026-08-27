@@ -2,6 +2,7 @@
 node_modules/
 dist/
 build/
+coverage/
 .pnpm-store/
 
 # Environment and secrets
@@ -15,12 +16,21 @@ build/
 *.sqlite
 *.db
 
+# Local run case files and approval ledger
+.ci-surgeon/
+audit/
+
 # Logs
 logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
+
+# Installed agent skills (reinstall with npx skills add)
+.agents/
+.grok/
+skills-lock.json
 
 # OS and IDE
 .DS_Store

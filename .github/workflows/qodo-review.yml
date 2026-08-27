@@ -1,3 +1,7 @@
+# Optional Actions-based PR-Agent. The hackathon's required reviewer is the
+# Qodo GitHub App (https://app.qodo.ai/signin). If the App is installed,
+# comment `/agentic_review` on the PR. This workflow is a backup when
+# OPENAI_KEY (or OPENAI_API_KEY) is set in repo secrets.
 name: Qodo PR Review Agent
 
 on:

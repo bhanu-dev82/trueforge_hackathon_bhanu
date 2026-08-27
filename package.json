@@ -1,28 +1,36 @@
 {
-  "name": "trueforge-agent-harness-submission",
+  "name": "trueforge-ci-failure-surgeon",
   "version": "1.0.0",
-  "description": "Production AI Agent built with TrueForge for The Agent Harness Hackathon",
+  "description": "TrueForge agent that reproduces a CI failure in a sandbox, drafts a patch, and pauses for approval",
   "main": "dist/index.js",
+  "type": "module",
   "scripts": {
-    "dev": "ts-node src/index.ts",
+    "dev": "tsx src/index.ts",
+    "demo": "tsx src/backend.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
-    "test": "jest"
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "test:fixture": "node --test fixture/auth-service/tests/token_verifier.test.mjs",
+    "verify": "npm run typecheck && npm test"
   },
-  "keywords": ["trueforge", "agent-harness", "truefoundry", "mcp", "qodo"],
-  "author": "Hackathon Team",
+  "keywords": [
+    "trueforge",
+    "agent-harness",
+    "mcp",
+    "daytona",
+    "qodo",
+    "gemini"
+  ],
+  "author": "Bhanu Nagpure",
   "license": "MIT",
   "dependencies": {
     "@truefoundry/trueforge-sdk": "^0.1.0",
-    "dotenv": "^16.4.5",
-    "zod": "^3.23.8"
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.12",
-    "@types/node": "^22.10.1",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.1.2",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.4.5"
+    "@types/node": "^22.13.5",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
   }
 }
