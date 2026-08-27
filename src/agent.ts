@@ -1,68 +1,173 @@
-import { TrueForgeClient } from '@truefoundry/trueforge-sdk';
-import { config } from './config.js';
+import { TrueForge } from '@truefoundry/trueforge-sdk';
+import { AGENT_NAME, buildAgentSpec } from './agent-spec.js';
+import { config, type AppConfig } from './config.js';
+import { formatTokenomics, observeTurn, unwrapTurnEvent, type HarnessEvent, type TurnObservation } from './events.js';
+import { checkTrueForge, createTrueForgeClient, describeTrueForgeError } from './harness.js';
+import { ResilientModelRouter } from './model-router.js';
+import { provisionHarness } from './provision.js';
+import { fixtureFailurePrompt } from './fixture-prompt.js';
+import { toHandoffPrompt, type CaseFile } from './case-file.js';
+import { evaluateBudget, readUsage } from './tokenomics.js';
 
-export class AgentHarnessRunner {
-  private client: TrueForgeClient;
+export interface TriageResult {
+  sessionId: string;
+  modelFqn: string;
+  observation: TurnObservation;
+  tokenomics: string;
+  provisionNotes: string[];
+}
 
-  constructor() {
-    this.client = new TrueForgeClient({
-      baseUrl: config.trueforgeApiUrl,
-      token: config.trueforgeApiToken,
-    });
+export type EventListener = (event: HarnessEvent) => void;
+
+export class CIFailureSurgeon {
+  private readonly client: TrueForge;
+  private readonly router: ResilientModelRouter;
+  private provisionNotes: string[] = [];
+  private provisioned = false;
+  private caseFile: CaseFile = {
+    repoUrl: 'fixture/auth-service',
+    testCommand: 'node --test tests/token_verifier.test.mjs',
+    stage: 'hunt',
+  };
+
+  constructor(
+    private readonly cfg: AppConfig = config,
+    private readonly onEvent: EventListener = () => undefined,
+  ) {
+    this.client = createTrueForgeClient(cfg);
+    this.router = new ResilientModelRouter(cfg);
   }
 
-  /**
-   * Registers or updates the main Hackathon Agent in TrueForge.
-   */
-  async setupAgent() {
-    console.log('[TrueForge] Registering Agent Definition...');
-    const agent = await this.client.agents.create({
-      name: 'production-agent-harness',
-      description: 'Production-ready AI agent with MCP tool routing, sub-agents, and safety gates',
-      systemPrompt: `You are an autonomous AI Agent built for The Agent Harness Hackathon.
-Your guidelines:
-1. Reason carefully and verify all inputs before taking destructive actions.
-2. Delegate specialized sub-tasks (e.g. log analysis, test generation) to dedicated sub-agents.
-3. Leverage connected MCP tools for real-world interactions.
-4. Output structured, clear explanations and interactive widgets via Generative UI.`,
-      model: {
-        provider: config.modelProvider,
-        modelId: config.modelId,
-        temperature: config.temperature,
-      },
-      connectors: ['github', 'slack'],
-      config: {
-        sandbox: { enabled: true },
-        generativeUi: { enabled: true },
-        clarifyingQuestions: { enabled: true },
-        subagents: { enabled: true },
-      },
-    });
-
-    console.log(`[TrueForge] Agent created successfully: ${agent.id}`);
-    return agent;
-  }
-
-  /**
-   * Runs an interactive turn against the agent session.
-   */
-  async executeTask(agentId: string, prompt: string) {
-    console.log(`[TrueForge] Creating session for agent: ${agentId}`);
-    const session = await this.client.sessions.create({ agentId });
-
-    console.log(`[TrueForge] Dispatching turn prompt: "${prompt}"`);
-    const stream = await this.client.sessions.turns.createStream(session.id, {
-      message: { role: 'user', content: prompt },
-    });
-
-    let fullResponse = '';
-    for await (const event of stream) {
-      if (event.type === 'text_delta') {
-        process.stdout.write(event.data.text);
-        fullResponse += event.data.text;
-      }
+  async preflight(): Promise<{ ok: boolean; detail: string; notes: string[] }> {
+    const health = await checkTrueForge(this.cfg.trueforgeApiUrl);
+    if (!health.ok) {
+      return { ...health, notes: [] };
     }
-    console.log('\n[TrueForge] Turn completed.');
-    return { sessionId: session.id, response: fullResponse };
+    if (!this.provisioned) {
+      this.provisionNotes = await provisionHarness(this.client, this.cfg);
+      this.provisioned = true;
+    }
+    return { ok: true, detail: health.detail, notes: this.provisionNotes };
+  }
+
+  async triage(failureReport = fixtureFailurePrompt()): Promise<TriageResult> {
+    const pre = await this.preflight();
+    if (!pre.ok) {
+      throw new Error(pre.detail);
+    }
+
+    const routed = await this.router.execute(
+      'triage',
+      async (modelFqn, hop) => {
+        this.emit({
+          at: new Date().toISOString(),
+          kind: 'model',
+          modelFqn,
+          text: hop > 0 ? `new session after quota failover → ${modelFqn}` : `session model ${modelFqn}`,
+        });
+        const sessionId = await this.openSession(modelFqn);
+        const prompt = hop > 0 ? `${toHandoffPrompt(this.caseFile)}\n\n${failureReport}` : failureReport;
+        return this.runUserTurn(sessionId, prompt, modelFqn);
+      },
+      'standard',
+    );
+
+    return {
+      ...routed.value,
+      modelFqn: routed.modelFqn,
+      provisionNotes: this.provisionNotes,
+    };
+  }
+
+  async approve(sessionId: string, threadId: string, toolCallIds: string[], allow: boolean): Promise<TurnObservation> {
+    const stream = await this.client.sessions.createTurnStream(sessionId, {
+      input: toolCallIds.map((toolCallId) => ({
+        type: 'user.tool_approval' as const,
+        threadId,
+        toolCallId,
+        approval: { status: allow ? 'allow' : 'deny' },
+      })),
+    });
+    return this.consume(stream);
+  }
+
+  private async openSession(modelFqn: string): Promise<string> {
+    const spec = buildAgentSpec(this.cfg, modelFqn);
+    try {
+      await this.client.agents.create({ name: AGENT_NAME, manifest: spec });
+    } catch {
+      // Name already taken — the live spec is still passed inline below.
+    }
+
+    const { data: session } = await this.client.sessions.create({
+      agent: { spec },
+    });
+    this.emit({
+      at: new Date().toISOString(),
+      kind: 'log',
+      text: `session ${session.id}`,
+    });
+    return session.id;
+  }
+
+  private async runUserTurn(sessionId: string, failureReport: string, modelFqn: string): Promise<TriageResult> {
+    const stream = await this.client.sessions.createTurnStream(sessionId, {
+      input: [{ type: 'user.message', content: failureReport }],
+    });
+    const observation = await this.consume(stream);
+    if (observation.sandboxIds[0]) {
+      this.caseFile.sandboxId = observation.sandboxIds[0];
+    }
+    if (observation.outputText) {
+      this.caseFile.stackHead = observation.outputText.slice(0, 600);
+    }
+    const budget = evaluateBudget(readUsage(observation.metrics), this.cfg);
+    this.emit({
+      at: new Date().toISOString(),
+      kind: 'metrics',
+      text: formatTokenomics(observation.metrics, modelFqn),
+      modelFqn,
+      metrics: observation.metrics,
+    });
+    if (budget.breached) {
+      throw new Error(`budget ${budget.used}/${budget.cap} tokens exceeded`);
+    }
+    if (observation.status === 'error') {
+      const errText = observation.events.find((e) => e.kind === 'error')?.text ?? 'turn error';
+      throw new Error(errText);
+    }
+    return {
+      sessionId,
+      modelFqn,
+      observation,
+      tokenomics: formatTokenomics(observation.metrics, modelFqn),
+      provisionNotes: this.provisionNotes,
+    };
+  }
+
+  private async consume(stream: AsyncIterable<unknown>): Promise<TurnObservation> {
+    const observer = observeTurn();
+    const streamWithMeta = stream as unknown as { withMetadata?: () => AsyncIterable<unknown> };
+    const iterable =
+      typeof streamWithMeta.withMetadata === 'function' ? streamWithMeta.withMetadata() : stream;
+
+    try {
+      for await (const item of iterable) {
+        const event = unwrapTurnEvent(item);
+        if (!event) {
+          continue;
+        }
+        for (const harnessEvent of observer.feed(event)) {
+          this.emit(harnessEvent);
+        }
+      }
+    } catch (error) {
+      throw new Error(describeTrueForgeError(error));
+    }
+    return observer.snapshot();
+  }
+
+  private emit(event: HarnessEvent): void {
+    this.onEvent(event);
   }
 }

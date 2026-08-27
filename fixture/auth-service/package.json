@@ -1,0 +1,8 @@
+{
+  "name": "auth-service-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/token_verifier.test.mjs"
+  }
+}

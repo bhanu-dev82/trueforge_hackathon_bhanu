@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#dfe6df" />
+    <meta name="color-scheme" content="light" />
+    <title>Case file — expired JWT still authenticates</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=Syne:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <a class="skip" href="#chart">Skip to case notes</a>
+
+    <div class="board">
+      <svg class="clip" viewBox="0 0 80 48" aria-hidden="true" focusable="false">
+        <rect x="28" y="2" width="24" height="18" rx="3" fill="#b08d57" />
+        <rect x="18" y="16" width="44" height="22" rx="4" fill="#8c6a3a" />
+        <rect x="24" y="20" width="32" height="12" rx="2" fill="#d6b36a" />
+      </svg>
+
+      <header class="mast">
+        <p class="file-no" translate="no">Case · fixture/auth-service</p>
+        <h1>Expired tokens still return 200</h1>
+        <p class="lede">
+          HMAC signatures are checked. The <code translate="no">exp</code> claim is not.
+          TrueForge reproduces that in a sandbox, drafts a patch, then waits for you
+          before any write.
+        </p>
+        <div class="mast-actions">
+          <button id="run" type="button">Reproduce the expired JWT</button>
+          <p id="health" class="status" role="status">Checking TrueForge…</p>
+        </div>
+      </header>
+
+      <ol class="checklist" aria-label="Surgical sequence">
+        <li data-stage="hunter"><span class="box" aria-hidden="true"></span> Hunter — run the failing test in the sandbox</li>
+        <li data-stage="surgeon"><span class="box" aria-hidden="true"></span> Surgeon — look up JWT <code translate="no">exp</code>, draft a one-line patch</li>
+        <li data-stage="insurance"><span class="box" aria-hidden="true"></span> Insurance — keep the regression test that would have caught this</li>
+        <li data-stage="approval"><span class="box" aria-hidden="true"></span> Consent — you allow or deny the write</li>
+      </ol>
+
+      <div class="split">
+        <section class="chart" id="chart">
+          <h2>Chart notes</h2>
+          <pre id="stream" class="notes" aria-live="polite">No case notes yet. Reproduce the fixture to start.</pre>
+        </section>
+
+        <aside class="vitals">
+          <h2>Vitals</h2>
+          <dl>
+            <div>
+              <dt>Model</dt>
+              <dd id="m-model" translate="no">—</dd>
+            </div>
+            <div>
+              <dt>Free-tier room</dt>
+              <dd id="m-quota">—</dd>
+            </div>
+            <div>
+              <dt>Sandbox</dt>
+              <dd id="m-sandbox" translate="no">—</dd>
+            </div>
+            <div>
+              <dt>Subagents</dt>
+              <dd id="m-threads">—</dd>
+            </div>
+            <div>
+              <dt>Tokens</dt>
+              <dd id="m-tokens">from TrueForge metrics, not an estimate</dd>
+            </div>
+          </dl>
+        </aside>
+      </div>
+    </div>
+
+    <dialog id="gate" aria-labelledby="gate-title">
+      <h2 id="gate-title">Awaiting consent</h2>
+      <p id="gate-detail">A write or destructive tool is paused. Nothing is applied until you choose.</p>
+      <div class="gate-actions">
+        <button id="allow" type="button" class="allow">Allow write</button>
+        <button id="deny" type="button" class="deny">Deny write</button>
+      </div>
+    </dialog>
+
+    <script src="/static/app.js" type="module"></script>
+  </body>
+</html>

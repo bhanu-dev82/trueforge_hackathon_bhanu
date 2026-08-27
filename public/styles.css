@@ -1,0 +1,288 @@
+:root {
+  --linen: #dfe6df;
+  --paper: #f3f6f2;
+  --ink: #1a2320;
+  --mute: #5c6b66;
+  --line: #c3cec6;
+  --arterial: #9e2a2b;
+  --suture: #2e5a45;
+  --brass: #b08d57;
+  --focus: #1a2320;
+  --display: "Syne", "Segoe UI", sans-serif;
+  --body: "Source Sans 3", "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--linen);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.skip {
+  position: absolute;
+  left: 12px;
+  top: -40px;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 8px 12px;
+  z-index: 10;
+}
+.skip:focus {
+  top: 12px;
+}
+
+.board {
+  position: relative;
+  max-width: 1080px;
+  margin: 48px auto 80px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 56px 40px 40px;
+  box-shadow: 0 18px 40px rgba(26, 35, 32, 0.08);
+}
+
+.clip {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  width: 80px;
+  height: 48px;
+  transform: translateX(-50%);
+}
+
+.file-no {
+  margin: 0 0 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(2rem, 4vw, 3.1rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+.lede {
+  max-width: 46rem;
+  color: var(--mute);
+  margin: 14px 0 0;
+}
+
+.lede code,
+.checklist code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+}
+
+.mast-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin-top: 28px;
+}
+
+button {
+  font-family: var(--body);
+  font-weight: 600;
+  font-size: 15px;
+  background: var(--ink);
+  color: var(--paper);
+  border: 0;
+  padding: 12px 16px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+
+button:hover {
+  background: #0f1614;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.status {
+  margin: 0;
+  font-size: 14px;
+  color: var(--mute);
+}
+
+.status.ok {
+  color: var(--suture);
+}
+
+.status.bad {
+  color: var(--arterial);
+}
+
+.checklist {
+  list-style: none;
+  margin: 36px 0 0;
+  padding: 20px 0 0;
+  border-top: 1px dashed var(--line);
+}
+
+.checklist li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 8px 0;
+  color: var(--mute);
+}
+
+.checklist li.active {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.checklist li.done {
+  color: var(--suture);
+}
+
+.checklist li.waiting .box {
+  background: var(--arterial);
+  border-color: var(--arterial);
+}
+
+.box {
+  width: 14px;
+  height: 14px;
+  margin-top: 4px;
+  border: 1.5px solid var(--ink);
+  flex: 0 0 14px;
+}
+
+.checklist li.done .box {
+  background: var(--suture);
+  border-color: var(--suture);
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.9fr);
+  gap: 28px;
+  margin-top: 32px;
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.notes {
+  min-height: 280px;
+  max-height: 480px;
+  overflow: auto;
+  margin: 0;
+  padding: 16px;
+  background: #eef2ec;
+  border: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.vitals dl {
+  margin: 0;
+}
+
+.vitals dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+dt {
+  color: var(--mute);
+}
+
+dd {
+  margin: 0;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+dialog {
+  border: 1px solid var(--arterial);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 28px;
+  max-width: 28rem;
+  overscroll-behavior: contain;
+}
+
+dialog::backdrop {
+  background: rgba(26, 35, 32, 0.45);
+}
+
+.gate-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.allow {
+  background: var(--suture);
+}
+
+.deny {
+  background: var(--arterial);
+  color: #fff;
+}
+
+@media (max-width: 840px) {
+  .board {
+    margin: 36px 12px 64px;
+    padding: 48px 18px 24px;
+  }
+  .split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button {
+    transition: none;
+  }
+}
